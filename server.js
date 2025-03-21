@@ -5,12 +5,27 @@ const OpenAI = require('openai');
 const cors = require('cors');
 const fs = require('fs');
 const sharp = require('sharp');
+require('dotenv').config();
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-app.use(express.json());
-app.use(cors());
+app.use(express.json());// CORS configuration for development and production
+const allowedOrigins = [
+  'http://localhost:5173', // Vite dev server
+  'http://localhost:3000', // Optional local frontend
+  'https://rizzing-frontend.netlify.app'
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST'],
+}));
 
 app.post('/rizzing', upload.single('image'), async (req, res) => {
   try {
@@ -18,7 +33,7 @@ app.post('/rizzing', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image uploaded' });
     }
 
-    const apiKey = req.headers['x-api-key'];
+    const apiKey = req.headers['x-api-key'] || process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
       return res.status(401).json({ error: 'API key required' });
     }
@@ -41,7 +56,7 @@ app.post('/rizzing', upload.single('image'), async (req, res) => {
     try {
       imageBuffer = await sharp(inputImagePath)
         .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-        .extract({ left, top, width: cropWidth, height: cropHeight })
+        .extract({ left, top, width: cropWidth, height: cropWidth })
         .toBuffer();
       await sharp(imageBuffer).toFile(croppedImagePath);
     } catch (cropErr) {
@@ -76,7 +91,7 @@ app.post('/reply', async (req, res) => {
       return res.status(400).json({ error: 'No conversation text provided' });
     }
 
-    const apiKey = req.headers['x-api-key'];
+    const apiKey = req.headers['x-api-key'] || process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
       return res.status(401).json({ error: 'API key required' });
     }
@@ -101,4 +116,5 @@ app.post('/reply', async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log('Backend running on http://localhost:3000'));
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Backend running on port ${port}`));
